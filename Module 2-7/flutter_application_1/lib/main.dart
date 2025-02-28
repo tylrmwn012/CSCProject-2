@@ -4,6 +4,7 @@ void main() { // opens main function to run the app
   runApp(const ScaffoldApp()); // runs the app based on the function ScaffoldApp
 } // closes main() function
 
+// Module 2 Code
 class ScaffoldApp extends StatelessWidget { // defines class ScaffoldApp which extends StatelessWidget, making the class immutable
   const ScaffoldApp({super.key}); // creates instance of ScaffoldApp which contains the super.key parameter 
 
@@ -45,6 +46,8 @@ class _ScaffoldState extends State<ScaffoldScreen> { // defines class _ScaffoldS
   } // close Widget build() section
 } // close _ScaffoldState class
 
+
+// Module 3 Code
 class MyCustomForm extends StatefulWidget { // defines class MyCustomForm which extends StatefulWidget, making the class immutable
   const MyCustomForm({super.key}); // creates instance of MyCustomForm which contains information from parameter super.key
 
