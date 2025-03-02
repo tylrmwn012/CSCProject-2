@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart'; // import package which contains flutter and dart functions
-import 'package:flutter_riverpod/flutter_riverpod.dart'; //[MODULE 4 - RIVERPOD]
+import 'package:flutter_riverpod/flutter_riverpod.dart'; //[MODULE 4 - RIVERPOD] import packages for riverpod use, such as StateProvider and Consumer
 
-final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]
-final encryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]
+final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]                                                                           [Monitor State Changes][Create State Providers]
+final encryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD] 
 void main() { // opens main function to run the app
-  runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]
+  runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]                             [Set Up Riverpod]
 } // closes main() function
 
-// Module 2 Code
+
+
+// ******************************** Module 2 Code *************************************
 class ScaffoldApp extends StatelessWidget { // defines class ScaffoldApp which extends StatelessWidget, making the class immutable
   const ScaffoldApp({super.key}); // creates instance of ScaffoldApp which contains the super.key parameter 
 
@@ -50,7 +52,8 @@ class _ScaffoldState extends State<ScaffoldScreen> { // defines class _ScaffoldS
 } // close _ScaffoldState class
 
 
-// Module 3 Code
+
+// ******************************** Module 3 Code *************************************
 class MyCustomForm extends StatefulWidget { // defines class MyCustomForm which extends StatefulWidget, making the class immutable
   const MyCustomForm({super.key}); // creates instance of MyCustomForm which contains information from parameter super.key
 
@@ -65,11 +68,14 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
 
   @override // allows us to override the information from the parent class build()
   Widget build(BuildContext context) { // opens widget build() with BuildContext in order to build the app with style choices
-    return Consumer( // **[RIVERPOD] Using Consumer to access providers**
+    
+    // returns the values to the providers at the top
+    return Consumer( // uses Consumer to access textProvider and encryptedTextProvider
       builder: (context, ref, child) { // passes context and ref for accessing providers //[MODULE 4 - RIVERPOD]
         final text = ref.watch(textProvider); // watches the textProvider for state updates //[MODULE 4 - RIVERPOD]
         final encryptedText = ref.watch(encryptedTextProvider); // watches the encryptedTextProvider for state updates //[MODULE 4 - RIVERPOD]
 
+        // adds padding around the text box
         return Padding( // adds padding to adjust spacing
           padding: const EdgeInsets.symmetric(horizontal: 16.0), // edits horizontal padding to be 16
           child: Form( // creates a form widget to group form-related fields together
@@ -77,14 +83,16 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
             child: Column( // open child section for column settings
               mainAxisSize: MainAxisSize.min, // prevents unnecessary space usage
               children: <Widget>[ // open children section for Widget
+                
+                // input box actions and style 
                 TextFormField( // creates an input field for user text
                   decoration: const InputDecoration( // open decoration section
                     labelText: 'Enter Text', // label above the input field
                     border: OutlineInputBorder(), // adds a visible border
                   ),
-                  initialValue: text, // initializes the text field with the provider's state
+                  initialValue: text, // [MODULE 4 - RIVERPOD]                                                                                              [Connect UI to Providers]
                   onChanged: (value) {
-                    ref.read(textProvider.notifier).state = value; //[MODULE 4 - RIVERPOD]
+                    ref.read(textProvider.notifier).state = value; //[MODULE 4 - RIVERPOD] 
                   },
                   validator: (value) { // validates user input
                     if (value == null || value.isEmpty) { // if value is nothing/empty...
@@ -94,19 +102,23 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                   }, // close validator section
                 ),
                 const SizedBox(height: 10), // space between text field and button
+                
+                // button style and actions
                 ElevatedButton( // creates a button to submit form
                   onPressed: () { // opens onPressed section for when button is pressed
-                    if (_formKey.currentState!.validate()) { // verifies if input is valid
-                      ref.read(encryptedTextProvider.notifier).state = encryptData(text); //[MODULE 4 - RIVERPOD]
+                    if (_formKey.currentState!.validate()) { // verifies if input is valid                                                                 [Validate and Prepare Data]
+                      ref.read(encryptedTextProvider.notifier).state = encryptData(text); //[MODULE 4 - RIVERPOD] calls encryptData function to take string input and encrypt
                       ScaffoldMessenger.of(context).showSnackBar( // calls ScaffoldMessenger function to display SnackBar
-                        const SnackBar(content: Text('Data Encrypted!')), //[MODULE 4 - RIVERPOD]
+                        const SnackBar(content: Text('Data Encrypted!')), //[MODULE 4 - RIVERPOD] indicate to user that the data was successfully encrypted
                       );
                     }
                   },
-                  child: const Text('Encrypt Data'), //[MODULE 4 - RIVERPOD]
+                  child: const Text('Encrypt Data'), //[MODULE 4 - RIVERPOD] indicate to user that the button encrypts the data
                 ),
                 const SizedBox(height: 10), // space between button and output text
-                Text('Encrypted Text: $encryptedText'), //[MODULE 4 - RIVERPOD]
+                
+                // text display when text is encrypted
+                Text('Encrypted Text: $encryptedText'), //[MODULE 4 - RIVERPOD] displays the encrypted text to the user (text entered in reverse)
               ],
             ),
           ),
@@ -116,15 +128,10 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
   } // close Widget build() section
 } // close MyCustomFormState class
 
-// Module 4 Code
-String encryptData(String input) { //[MODULE 4 - RIVERPOD]
-  return input.split('').reversed.join(); //[MODULE 4 - RIVERPOD]
-}
 
 
-
-
-
-
-
+// ******************************** Module 4 Code *************************************
+String encryptData(String input) { //[MODULE 4 - RIVERPOD]  function which takes string input                                                                [Validate and Prepare Data]
+  return input.split('').reversed.join(); //[MODULE 4 - RIVERPOD] // returns the given string backward 
+} // close function
 
