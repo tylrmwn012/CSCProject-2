@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart'; // import package which contains flutter and dart functions
+import 'package:flutter_riverpod/flutter_riverpod.dart'; //[MODULE 4 - RIVERPOD]
 
+final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]
+final encryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]
 void main() { // opens main function to run the app
-  runApp(const ScaffoldApp()); // runs the app based on the function ScaffoldApp
+  runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]
 } // closes main() function
 
 // Module 2 Code
@@ -57,44 +60,71 @@ class MyCustomForm extends StatefulWidget { // defines class MyCustomForm which 
   }
 } // close MyCustomForm class
 
-class MyCustomFormState extends State<MyCustomForm> { // defines class MyCustomFormState which extends State<MyCustomForm>, associating it with the MyCustomForm class
+class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with Riverpod**
   final _formKey = GlobalKey<FormState>(); // creates a key that identifies the form and allows validation
 
   @override // allows us to override the information from the parent class build()
   Widget build(BuildContext context) { // opens widget build() with BuildContext in order to build the app with style choices
-    return Padding( // adds padding to adjust spacing
-      padding: const EdgeInsets.symmetric(horizontal: 16.0), // edits horizontal padding to be 16
-      child: Form( // creates a form widget to group form-related fields together
-        key: _formKey, // assigns the unique form key
-        child: Column( // open child section for column settings
-          mainAxisSize: MainAxisSize.min, // prevents unnecessary space usage
-          children: <Widget>[ // open children seciton for Widget
-            TextFormField( // creates an input field for user text
-              decoration: const InputDecoration( // open decoration section
-                labelText: 'Enter Text', // label above the input field
-                border: OutlineInputBorder(), // adds a visible border
-              ),
-              validator: (value) { // validates user input
-                if (value == null || value.isEmpty) { // if value is nothing/empty...
-                  return 'Please enter some text'; // display error message
-                } // close if statement section
-                return null; // returns nothing
-              }, // close validator section
+    return Consumer( // **[RIVERPOD] Using Consumer to access providers**
+      builder: (context, ref, child) { // passes context and ref for accessing providers //[MODULE 4 - RIVERPOD]
+        final text = ref.watch(textProvider); // watches the textProvider for state updates //[MODULE 4 - RIVERPOD]
+        final encryptedText = ref.watch(encryptedTextProvider); // watches the encryptedTextProvider for state updates //[MODULE 4 - RIVERPOD]
+
+        return Padding( // adds padding to adjust spacing
+          padding: const EdgeInsets.symmetric(horizontal: 16.0), // edits horizontal padding to be 16
+          child: Form( // creates a form widget to group form-related fields together
+            key: _formKey, // assigns the unique form key
+            child: Column( // open child section for column settings
+              mainAxisSize: MainAxisSize.min, // prevents unnecessary space usage
+              children: <Widget>[ // open children section for Widget
+                TextFormField( // creates an input field for user text
+                  decoration: const InputDecoration( // open decoration section
+                    labelText: 'Enter Text', // label above the input field
+                    border: OutlineInputBorder(), // adds a visible border
+                  ),
+                  initialValue: text, // initializes the text field with the provider's state
+                  onChanged: (value) {
+                    ref.read(textProvider.notifier).state = value; //[MODULE 4 - RIVERPOD]
+                  },
+                  validator: (value) { // validates user input
+                    if (value == null || value.isEmpty) { // if value is nothing/empty...
+                      return 'Please enter some text'; // display error message
+                    } // close if statement section
+                    return null; // returns nothing
+                  }, // close validator section
+                ),
+                const SizedBox(height: 10), // space between text field and button
+                ElevatedButton( // creates a button to submit form
+                  onPressed: () { // opens onPressed section for when button is pressed
+                    if (_formKey.currentState!.validate()) { // verifies if input is valid
+                      ref.read(encryptedTextProvider.notifier).state = encryptData(text); //[MODULE 4 - RIVERPOD]
+                      ScaffoldMessenger.of(context).showSnackBar( // calls ScaffoldMessenger function to display SnackBar
+                        const SnackBar(content: Text('Data Encrypted!')), //[MODULE 4 - RIVERPOD]
+                      );
+                    }
+                  },
+                  child: const Text('Encrypt Data'), //[MODULE 4 - RIVERPOD]
+                ),
+                const SizedBox(height: 10), // space between button and output text
+                Text('Encrypted Text: $encryptedText'), //[MODULE 4 - RIVERPOD]
+              ],
             ),
-            SizedBox(height: 10), // space between text field and button
-            ElevatedButton( // creates a button to submit form
-              onPressed: () { // opens onPressed section for when button is pressed
-                if (_formKey.currentState!.validate()) { // verifies if input is valid
-                  ScaffoldMessenger.of(context).showSnackBar( // calls ScaffoldMessenger function to display SnackBar
-                    const SnackBar(content: Text('Processing Data')), // displays a message when form is submitted
-                  ); 
-                }
-              },
-              child: const Text('Submit'), // sets text inside of button
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   } // close Widget build() section
 } // close MyCustomFormState class
+
+// Module 4 Code
+String encryptData(String input) { //[MODULE 4 - RIVERPOD]
+  return input.split('').reversed.join(); //[MODULE 4 - RIVERPOD]
+}
+
+
+
+
+
+
+
+
