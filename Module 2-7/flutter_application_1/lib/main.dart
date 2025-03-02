@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart'; // import package which contains flutter and dart functions
 import 'package:flutter_riverpod/flutter_riverpod.dart'; //[MODULE 4 - RIVERPOD] import packages for riverpod use, such as StateProvider and Consumer
+import 'package:encrypt/encrypt.dart' as encrypt; // [MODULE 5]
 
 final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]                                                                           [Monitor State Changes][Create State Providers]
 final encryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD] 
+
+final key = encrypt.Key.fromUtf8('my 32 length key................'); // 32 character key
+final iv = encrypt.IV.fromLength(16); // 16 byte IV
+final encrypter = encrypt.Encrypter(encrypt.AES(key));
+
 void main() { // opens main function to run the app
   runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]                             [Set Up Riverpod]
 } // closes main() function
@@ -107,7 +113,8 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                 ElevatedButton( // creates a button to submit form
                   onPressed: () { // opens onPressed section for when button is pressed
                     if (_formKey.currentState!.validate()) { // verifies if input is valid                                                                 [Validate and Prepare Data]
-                      ref.read(encryptedTextProvider.notifier).state = encryptData(text); //[MODULE 4 - RIVERPOD] calls encryptData function to take string input and encrypt
+                      final encrypted = encryptData(text);
+                      ref.read(encryptedTextProvider.notifier).state = encrypted; //[MODULE 4 - RIVERPOD] calls encryptData function to take string input and encrypt
                       ScaffoldMessenger.of(context).showSnackBar( // calls ScaffoldMessenger function to display SnackBar
                         const SnackBar(content: Text('Data Encrypted!')), //[MODULE 4 - RIVERPOD] indicate to user that the data was successfully encrypted
                       );
@@ -115,10 +122,16 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                   },
                   child: const Text('Encrypt Data'), //[MODULE 4 - RIVERPOD] indicate to user that the button encrypts the data
                 ),
-                const SizedBox(height: 10), // space between button and output text
-                
+
                 // text display when text is encrypted
+                const SizedBox(height:10),
                 Text('Encrypted Text: $encryptedText'), //[MODULE 4 - RIVERPOD] displays the encrypted text to the user (text entered in reverse)
+                const SizedBox(height:10),
+                Text(
+                  encryptedText.isNotEmpty
+                      ? 'Decrypted Text: ${decryptData(encryptedText)}'
+                      : '',
+                ),
               ],
             ),
           ),
@@ -131,7 +144,13 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
 
 
 // ******************************** Module 4 Code *************************************
-String encryptData(String input) { //[MODULE 4 - RIVERPOD]  function which takes string input                                                                [Validate and Prepare Data]
-  return input.split('').reversed.join(); //[MODULE 4 - RIVERPOD] // returns the given string backward 
-} // close function
+String encryptData(String input) {
+  return encrypter.encrypt(input, iv: iv).base64; // Return base64 encrypted string
+}
 
+
+
+// ******************************** Module 5 Code *************************************
+String decryptData(String encryptedInput) {
+  return encrypter.decrypt(encrypt.Encrypted.fromBase64(encryptedInput), iv: iv); // Decrypt using base64 input
+}
