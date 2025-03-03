@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart'; // import package which contains flutter and dart functions
 import 'package:flutter_riverpod/flutter_riverpod.dart'; //[MODULE 4 - RIVERPOD] import packages for riverpod use, such as StateProvider and Consumer
 import 'package:encrypt/encrypt.dart' as encrypt; // [MODULE 5]
+import 'package:uuid/uuid.dart'; //[MODULE 6]
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; //[MODULE 6]
+import 'package:permission_handler/permission_handler.dart'; //[MODULE 6]
 
 final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]                                                                           [Monitor State Changes][Create State Providers]
 final encryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD] 
@@ -9,10 +12,11 @@ final key = encrypt.Key.fromUtf8('my 32 length key................'); // initial
 final iv = encrypt.IV.fromLength(16); // set IV to 16 byte
 final encrypter = encrypt.Encrypter(encrypt.AES(key)); // call Encryptor from encrypt package to encrypt using key
 
+final storage = FlutterSecureStorage(); // [MODULE 6] initialize secure storage
+
 void main() { // opens main function to run the app
   runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]                             [Set Up Riverpod]
 } // closes main() function
-
 
 
 // ******************************** Module 2 Code *************************************
@@ -32,7 +36,15 @@ class ScaffoldScreen extends StatefulWidget { // defines class ScaffoldScreen wh
   State<ScaffoldScreen> createState() => _ScaffoldState(); // creates an instance of ScaffoldScreen which updates the widget based on _ScaffoldState
 } // close ScaffoldScreen class
 
-class _ScaffoldState extends State<ScaffoldScreen> { // defines class _ScaffoldState which extends State<ScaffoldScreen>, associating it with the ScaffoldScreen class
+class _ScaffoldState extends State<ScaffoldScreen> {
+  Future<String>? decryptedFuture; // store Future to prevent unnecessary re-execution
+
+  @override // allows us to override information from parent class initState()
+  void initState() { // call function initState() to be altered
+    super.initState(); // calls parent class to initialize information
+    decryptedFuture = decryptStoredData(); // set decryptedFuture equal to function decryptedStoredData()
+  }
+
   @override // allows us to override the information from the parent class build()
   Widget build(BuildContext context) { // opens widget build() with BuildContext in order to build the app with style choices
     return Scaffold( // returns information built in the function Scaffold to void main
@@ -58,7 +70,6 @@ class _ScaffoldState extends State<ScaffoldScreen> { // defines class _ScaffoldS
 } // close _ScaffoldState class
 
 
-
 // ******************************** Module 3 Code *************************************
 class MyCustomForm extends StatefulWidget { // defines class MyCustomForm which extends StatefulWidget, making the class immutable
   const MyCustomForm({super.key}); // creates instance of MyCustomForm which contains information from parameter super.key
@@ -68,7 +79,6 @@ class MyCustomForm extends StatefulWidget { // defines class MyCustomForm which 
     return MyCustomFormState(); // return information from MyCustomFormState()
   }
 } // close MyCustomForm class
-
 
 class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with Riverpod**
   final _formKey = GlobalKey<FormState>(); // creates a key that identifies the form and allows validation
@@ -98,7 +108,7 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                     border: OutlineInputBorder(), // adds a visible border
                   ),
                   initialValue: text, // [MODULE 4 - RIVERPOD]                                                                                              [Connect UI to Providers]
-                  onChanged: (value) {
+                  onChanged: (value) { // when value is changed (user enters text)...
                     ref.read(textProvider.notifier).state = value; //[MODULE 4 - RIVERPOD] 
                   },
                   validator: (value) { // validates user input
@@ -112,12 +122,12 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                 
                 // button style and actions
                 ElevatedButton( // creates a button to submit form
-                  onPressed: () { // opens onPressed section for when button is pressed
-                    if (_formKey.currentState!.validate()) { // verifies if input is valid                                                                 [Validate and Prepare Data]
-                      final encrypted = encryptData(text); //[MODULE 5] calls encryptData function to encrypt the input and label it as encrypted
-                      ref.read(encryptedTextProvider.notifier).state = encrypted; //[MODULE 4 - RIVERPOD] calls encryptData function to take string input and encrypt
-                      ScaffoldMessenger.of(context).showSnackBar( // calls ScaffoldMessenger function to display SnackBar
-                        const SnackBar(content: Text('Data Encrypted!')), //[MODULE 4 - RIVERPOD] indicate to user that the data was successfully encrypted
+                  onPressed: () async { // when the button is pressed (calls async to sync info with other functions like request permission)
+                    if (_formKey.currentState!.validate()) { // verifies if input is valid  
+                      await storeEncryptedData(ref.read(textProvider)); // store the encrypted data
+                      ref.read(encryptedTextProvider.notifier).state = encryptData(ref.read(textProvider)); // encrypts data if necessary
+                      ScaffoldMessenger.of(context).showSnackBar( // call snackbar
+                        const SnackBar(content: Text('Data Encrypted & Stored')), // print text at bottom of the screen if successful
                       );
                     }
                   },
@@ -128,32 +138,71 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                 const SizedBox(height:10), // initialize box which will hold encryption
                 Text('Encrypted Text: $encryptedText'), //[MODULE 4 - RIVERPOD] displays the encrypted text to the user (text entered in reverse)
                 
-                // display decrypted text
-                const SizedBox(height:10), // initialize box for text which will hold decryption
-                Text( // open text section for text beneath button
-                  encryptedText.isNotEmpty // while encryptedTexy is not empty
-                      ? 'Decrypted Text: ${decryptData(encryptedText)}' // display the decrypted text if valid input was entered
-                      : '', // if there hasn't been an input entered then leave the line blank
-                ),
+                const SizedBox(height:10), // initialize box with size 10
+                FutureBuilder<String>( 
+                  future: decryptStoredData(), // Call the decryption function
+                  builder: (context, snapshot) { // call snapshot
+                    if (snapshot.connectionState == ConnectionState.waiting) { // if snapshot is waiting...
+                      return const Text('Decrypting...'); // show a loading state to prompt is is waiting
+                    } else if (snapshot.hasError) { // if there's an error...
+                      return Text('Error: ${snapshot.error}'); // show error if any errors occur (not likely)
+                    } else { // else
+                      return Text('Decrypted Text: ${snapshot.data ?? "No Data"}'); // Show decrypted data
+                    }
+                  },
+                )
               ],
             ),
           ),
         );
       },
     );
-  } // close Widget build() section
-} // close MyCustomFormState class
+  }
+}
 
 
 
 // ******************************** Module 4 Code *************************************
-String encryptData(String input) { // open function with takes string input and converts it to base64 encrytion
-  return encrypter.encrypt(input, iv: iv).base64; // return base64 encrypted string
+String encryptData(String input) { // function which takes user's input and encrypts
+  return encrypter.encrypt(input, iv: iv).base64; // return encryption of user's input with base64
+}
+
+Future<void> storeEncryptedData(String text) async { // store encrypted data in secure storage
+  final iv = encrypt.IV.fromLength(16); // Generate a unique IV for this encryption
+  final encrypted = encrypter.encrypt(text, iv: iv); // set encrypted equal to the final encryption of the text
+  
+  // Store both IV and encrypted text
+  await storage.write(key: "secure_data", value: "${iv.base64}:${encrypted.base64}"); // store IV with encryption of text
 }
 
 
 
 // ******************************** Module 5 Code *************************************
-String decryptData(String encryptedInput) { // take base64 input and converts it to originally given string
-  return encrypter.decrypt(encrypt.Encrypted.fromBase64(encryptedInput), iv: iv); // decrypt using base64 input
+Future<String> decryptStoredData() async { // function which takes encryption and decrypts it to user
+  String? storedData = await storage.read(key: "secure_data"); // set storedData equal to info from the given key
+  if (storedData != null && storedData.contains(":")) { // check that storedData isn't null and that it contains ":"
+    // extract IV and encrypted text
+    final parts = storedData.split(":"); // set parts equal to the stored data split at :
+    final iv = encrypt.IV.fromBase64(parts[0]); // set iv equal to the first element split by :
+    final encryptedData = encrypt.Encrypted.fromBase64(parts[1]); // set encrypted data equal to the second part split by :
+
+    return encrypter.decrypt(encryptedData, iv: iv); // return decrypted data
+  }
+  return "No Data Found"; // return that no data was found to decrypt
+}
+
+
+
+// ******************************** Module 6 Code *************************************
+String idGeneration() { // function to generate and return uuid
+  var uuid = Uuid(); // call Uuid() function and set as variable uuid
+  return uuid.v4(); // return uuid generated
+}
+
+Future<void> requestPermission() async { // function to request permission before storage
+  if (await Permission.storage.request().isGranted) { // request permission to store. if True...
+    print("Storage permission granted"); // if permission is granted, display to user
+  } else {
+    print("Storage permission denied"); // if permission is denied, display message to user
+  }
 }
