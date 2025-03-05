@@ -5,8 +5,10 @@ import 'package:uuid/uuid.dart'; //[MODULE 6]
 import 'package:flutter_secure_storage/flutter_secure_storage.dart'; //[MODULE 6]
 import 'package:permission_handler/permission_handler.dart'; //[MODULE 6]
 
-final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]                                                                           [Monitor State Changes][Create State Providers]
+final textProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]                                                                          
 final encryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD] 
+final decryptedTextProvider = StateProvider<String>((ref) => ""); //[MODULE 4 - RIVERPOD]
+
 
 final key = encrypt.Key.fromUtf8('my 32 length key................'); // initialize 32 character key for encryption/decryption
 final iv = encrypt.IV.fromLength(16); // set IV to 16 byte
@@ -15,7 +17,7 @@ final encrypter = encrypt.Encrypter(encrypt.AES(key)); // call Encryptor from en
 final storage = FlutterSecureStorage(); // [MODULE 6] initialize secure storage
 
 void main() { // opens main function to run the app
-  runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]                             [Set Up Riverpod]
+  runApp(const ProviderScope(child: ScaffoldApp())); // runs the app based on the function ScaffoldApp //[MODULE 4 - RIVERPOD]                           
 } // closes main() function
 
 
@@ -87,10 +89,12 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
   Widget build(BuildContext context) { // opens widget build() with BuildContext in order to build the app with style choices
     
     // returns the values to the providers at the top
-    return Consumer( // uses Consumer to access textProvider and encryptedTextProvider
+    return Consumer( // uses Consumer to access textProvider and Provider
       builder: (context, ref, child) { // passes context and ref for accessing providers //[MODULE 4 - RIVERPOD]
         final text = ref.watch(textProvider); // watches the textProvider for state updates //[MODULE 4 - RIVERPOD]
         final encryptedText = ref.watch(encryptedTextProvider); // watches the encryptedTextProvider for state updates //[MODULE 4 - RIVERPOD]
+        final decryptedText = ref.watch(decryptedTextProvider); // Watches decrypted text state
+
 
         // adds padding around the text box
         return Padding( // adds padding to adjust spacing
@@ -107,7 +111,7 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                     labelText: 'Enter Text', // label above the input field
                     border: OutlineInputBorder(), // adds a visible border
                   ),
-                  initialValue: text, // [MODULE 4 - RIVERPOD]                                                                                              [Connect UI to Providers]
+                  initialValue: text, // [MODULE 4 - RIVERPOD]                                                                                              
                   onChanged: (value) { // when value is changed (user enters text)...
                     ref.read(textProvider.notifier).state = value; //[MODULE 4 - RIVERPOD] 
                   },
@@ -120,7 +124,7 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                 ),
                 const SizedBox(height: 10), // space between text field and button
                 
-                // button style and actions
+                // [ENCRYPT] button style and actions
                 ElevatedButton( // creates a button to submit form
                   onPressed: () async { // when the button is pressed (calls async to sync info with other functions like request permission)
                     if (_formKey.currentState!.validate()) { // verifies if input is valid  
@@ -134,23 +138,23 @@ class MyCustomFormState extends State<MyCustomForm> { // **StatefulWidget with R
                   child: const Text('Encrypt Data'), //[MODULE 4 - RIVERPOD] indicate to user that the button encrypts the data
                 ),
 
-                // display encrypted text
-                const SizedBox(height:10), // initialize box which will hold encryption
-                Text('Encrypted Text: $encryptedText'), //[MODULE 4 - RIVERPOD] displays the encrypted text to the user (text entered in reverse)
-                
-                const SizedBox(height:10), // initialize box with size 10
-                FutureBuilder<String>( 
-                  future: decryptStoredData(), // Call the decryption function
-                  builder: (context, snapshot) { // call snapshot
-                    if (snapshot.connectionState == ConnectionState.waiting) { // if snapshot is waiting...
-                      return const Text('Decrypting...'); // show a loading state to prompt is is waiting
-                    } else if (snapshot.hasError) { // if there's an error...
-                      return Text('Error: ${snapshot.error}'); // show error if any errors occur (not likely)
-                    } else { // else
-                      return Text('Decrypted Text: ${snapshot.data ?? "No Data"}'); // Show decrypted data
-                    }
+                // [DECRYPT] button action
+                ElevatedButton(
+                  onPressed: () async { // when the button is pressed...
+                    final decryptedTextValue = await decryptStoredData(); // call function to decrypt the stored data
+                    ref.read(decryptedTextProvider.notifier).state = decryptedTextValue; // updates provider to decryptedTextValue
+                    ScaffoldMessenger.of(context).showSnackBar( // open snackbar for styling
+                      const SnackBar(content: Text('Data Decrypted & Displayed')), // display message at bottom of the screen to tell user decryption processed
+                    );
                   },
-                )
+                  child: const Text('Decrypt Data'), // display text "decrypt data" inside of button
+                ),
+
+                const SizedBox(height:10), // initialize box which will hold encryption
+                Text('Encrypted Text: $encryptedText'), // display encrypted text to user
+
+                const SizedBox(height: 10), // initialize box which will hold decryption
+                Text('Decrypted Data: $decryptedText'), // display decrypted text to user
               ],
             ),
           ),
@@ -167,29 +171,30 @@ String encryptData(String input) { // function which takes user's input and encr
   return encrypter.encrypt(input, iv: iv).base64; // return encryption of user's input with base64
 }
 
-Future<void> storeEncryptedData(String text) async { // store encrypted data in secure storage
-  final iv = encrypt.IV.fromLength(16); // Generate a unique IV for this encryption
-  final encrypted = encrypter.encrypt(text, iv: iv); // set encrypted equal to the final encryption of the text
-  
-  // Store both IV and encrypted text
-  await storage.write(key: "secure_data", value: "${iv.base64}:${encrypted.base64}"); // store IV with encryption of text
+Future<void> storeEncryptedData(String text) async {
+  final iv = encrypt.IV.fromLength(16); // Generate a new IV per encryption
+  final encrypted = encrypter.encrypt(text, iv: iv); // encrypts text and stores associated iv
+
+  await storage.write(key: "secure_data", value: "${iv.base64}:${encrypted.base64}"); // store iv and encrypted data in one string
 }
+
 
 
 
 // ******************************** Module 5 Code *************************************
-Future<String> decryptStoredData() async { // function which takes encryption and decrypts it to user
-  String? storedData = await storage.read(key: "secure_data"); // set storedData equal to info from the given key
-  if (storedData != null && storedData.contains(":")) { // check that storedData isn't null and that it contains ":"
-    // extract IV and encrypted text
-    final parts = storedData.split(":"); // set parts equal to the stored data split at :
-    final iv = encrypt.IV.fromBase64(parts[0]); // set iv equal to the first element split by :
-    final encryptedData = encrypt.Encrypted.fromBase64(parts[1]); // set encrypted data equal to the second part split by :
+Future<String> decryptStoredData() async {
+  String? storedData = await storage.read(key: "secure_data");
 
-    return encrypter.decrypt(encryptedData, iv: iv); // return decrypted data
+  if (storedData != null && storedData.contains(":")) {
+    final parts = storedData.split(":");
+    final iv = encrypt.IV.fromBase64(parts[0]);
+    final encryptedData = encrypt.Encrypted.fromBase64(parts[1]);
+
+    return encrypter.decrypt(encryptedData, iv: iv);
   }
-  return "No Data Found"; // return that no data was found to decrypt
+  return "No Data Found";
 }
+
 
 
 
@@ -198,6 +203,8 @@ String idGeneration() { // function to generate and return uuid
   var uuid = Uuid(); // call Uuid() function and set as variable uuid
   return uuid.v4(); // return uuid generated
 }
+
+
 
 Future<void> requestPermission() async { // function to request permission before storage
   if (await Permission.storage.request().isGranted) { // request permission to store. if True...
